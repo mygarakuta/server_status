@@ -10,14 +10,19 @@ BookOasis 홈 대시보드에 CPU / 메모리 / 디스크 사용률과
 "+ 위젯 추가" 목록에서 직접 추가해야만 노출됩니다.
 (사이드바 카테고리나 [플러그인] 공통 데스크 탭에는 노출되지 않습니다.)
 
+v1.1.0: 플러그인 설정에서 "작은 화면(1칸)/큰 화면(2칸)"을 고를 수 있는
+        WIDGET_SIZE 옵션을 추가했습니다. 큰 화면을 선택하면 grid에서
+        2칸을 차지하며, 남는 공간에 스왑 사용률/네트워크 누적 트래픽
+        카드가 추가로 표시됩니다.
+
 설치 방법:
 1. 이 폴더(server_status) 전체를 BookOasis의 `plugins/metadata/` 아래로 복사합니다.
 2. (필요 시) requirements.txt가 자동으로 처리되어 psutil이 설치됩니다.
 3. 서버를 재시작합니다.
 4. [환경설정 > 플러그인 설정]에서 "서버 상태 모니터"를 활성화하고,
-   필요하면 경고 임계치를 조정 후 저장합니다.
+   필요하면 경고 임계치와 위젯 크기를 조정 후 저장합니다.
 5. [내 설정 > 홈 화면 플러그인 배치 모드]를 켠 뒤, 홈 화면의
-   "+ 위젯 추가" 목록에서 "서버 상태" 위젯을 추가합니다.
+   "+ 위젯 추가" 목록에서 "홈 서버 자원 상태" 위젯을 추가합니다.
 """
 import time
 import json
@@ -44,22 +49,38 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
         {"key": "DISK_WARN", "label": "디스크 경고 임계치(%)", "type": "number", "default": 90},
         {"key": "DISK_PATH", "label": "디스크 확인 경로", "type": "text", "default": "/"},
         {"key": "CACHE_TTL_SEC", "label": "측정값 캐시 시간(초)", "type": "number", "default": 5},
+        {
+            "key": "WIDGET_SIZE",
+            "label": "홈 위젯 크기",
+            "type": "select",
+            "default": "small",
+            "options": [
+                {"value": "small", "label": "작은 화면 (1칸, CPU/메모리/디스크/가동시간)"},
+                {"value": "large", "label": "큰 화면 (2칸, 스왑·네트워크 정보 추가)"},
+            ],
+        },
     ]
-
-    # ── 홈 대시보드 전용 위젯 매니페스트 (dashboard_widget 아님에 주의) ──
-    home_widget = {
-        "title": "서버 상태",
-        "subtitle": "CPU / 메모리 / 디스크",
-        "icon": "fa-solid fa-server",
-        "order": 55,        # 코어 3섹션(10/20/30)보다 뒤에 배치
-        "limit": 10,
-        "sessions": "all",  # general/adult/audiobook/video 전 세션 노출
-        "layout": "grid",   # 다른 grid 위젯과 나란히 카드로 배치
-        "size": 1,
-    }
 
     # 자동 업데이트 기능은 사용하지 않음 (개인 배포 플러그인 전제)
     update_manifest = {"enabled": False}
+
+    # ── 홈 대시보드 전용 위젯 매니페스트 ──
+    # WIDGET_SIZE 설정값에 따라 grid 칸 수(size)와 노출 아이템 개수(limit)가
+    # 달라져야 하므로 클래스 속성(dict)이 아니라 property로 선언합니다.
+    # (코어는 위젯을 렌더링할 때 플러그인 인스턴스를 통해 이 값을 읽습니다.)
+    @property
+    def home_widget(self):
+        is_large = self._get_widget_size() == "large"
+        return {
+            "title": "홈 서버 자원 상태",
+            "subtitle": "CPU / 메모리 / 디스크" + (" / 스왑 / 네트워크" if is_large else ""),
+            "icon": "fa-solid fa-server",
+            "order": 55,          # 코어 3섹션(10/20/30)보다 뒤에 배치
+            "limit": 6 if is_large else 4,
+            "sessions": "all",    # general/adult/audiobook/video 전 세션 노출
+            "layout": "grid",
+            "size": 2 if is_large else 1,  # 작은 화면=1칸, 큰 화면=2칸
+        }
 
     # ── 필수 계약: 이 플러그인은 검색/적용 기능을 쓰지 않음 ──
     def search(self, db_type, query):
@@ -69,6 +90,13 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
         return False, "이 플러그인은 대시보드 전용이며 메타데이터 적용을 지원하지 않습니다."
 
     # ── 내부 헬퍼 ──
+    def _get_widget_size(self):
+        # 위젯 크기는 세션(일반/성인/오디오북/영상)과 무관하게 하나로
+        # 통일해서 관리하는 편이 자연스러우므로 'general' 설정을 기준으로 삼습니다.
+        cfg = self.get_plugin_config("general", default={})
+        value = str(cfg.get("WIDGET_SIZE", "small")).strip().lower()
+        return "large" if value == "large" else "small"
+
     def _get_config(self, db_type):
         cfg = self.get_plugin_config(db_type, default={})
 
@@ -101,6 +129,15 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
         return " ".join(parts)
 
     @staticmethod
+    def _format_bytes(num_bytes):
+        value = float(num_bytes)
+        for unit in ("B", "KB", "MB", "GB", "TB"):
+            if value < 1024.0:
+                return f"{value:.1f}{unit}"
+            value /= 1024.0
+        return f"{value:.1f}PB"
+
+    @staticmethod
     def _status_icon(value, warn):
         if value is None:
             return "❔"
@@ -110,7 +147,7 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
             return "🟡"
         return "🟢"
 
-    def _collect_metrics(self, db_type):
+    def _collect_metrics(self, db_type, is_large):
         if psutil is None:
             return {"success": False, "error": "psutil 모듈이 설치되어 있지 않습니다."}
 
@@ -165,26 +202,55 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
             },
         ]
 
+        # 큰 화면(2칸)을 선택한 경우, 남는 공간에 스왑/네트워크 카드를 추가
+        if is_large:
+            try:
+                swap = psutil.swap_memory()
+                swap_desc = (
+                    f"사용 {swap.used // (1024 ** 2):,}MB / 전체 {swap.total // (1024 ** 2):,}MB"
+                    if swap.total > 0 else "스왑 미설정"
+                )
+                items.append({
+                    "item_type": "metric",
+                    "metric": "스왑 사용률",
+                    "value": f"{swap.percent:.1f}%" if swap.total > 0 else "N/A",
+                    "description": swap_desc,
+                })
+            except Exception:
+                pass
+
+            try:
+                net = psutil.net_io_counters()
+                items.append({
+                    "item_type": "metric",
+                    "metric": "네트워크 누적 트래픽",
+                    "value": f"↑{self._format_bytes(net.bytes_sent)} / ↓{self._format_bytes(net.bytes_recv)}",
+                    "description": "서버 부팅 이후 누적 송신/수신량",
+                })
+            except Exception:
+                pass
+
         return {"success": True, "items": items}
 
     # ── 공통 계약: home_widget이 재사용하는 표준 메서드 ──
     def get_dashboard_data(self, db_type, limit=10):
-        cfg_ttl_key = f"metrics:{db_type}"
+        is_large = self._get_widget_size() == "large"
+        cache_key = f"metrics:{db_type}:{'large' if is_large else 'small'}"
 
         # psutil은 로컬 측정이라 가볍지만, 홈 화면을 자주 여는 상황을
         # 대비해 짧은 TTL 캐시로 중복 측정을 줄인다 (가이드 §5-1 권장 사항).
-        cached = self.cache_get(cfg_ttl_key)
+        cached = self.cache_get(cache_key)
         if cached:
             try:
                 return json.loads(cached)
             except Exception:
                 pass
 
-        result = self._collect_metrics(db_type)
+        result = self._collect_metrics(db_type, is_large)
         if result.get("success"):
             try:
                 ttl = self._get_config(db_type)["cache_ttl"]
-                self.cache_set(cfg_ttl_key, json.dumps(result), ttl=max(ttl, 1))
+                self.cache_set(cache_key, json.dumps(result), ttl=max(ttl, 1))
             except Exception:
                 pass
         return result
