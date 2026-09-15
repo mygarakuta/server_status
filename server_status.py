@@ -139,10 +139,6 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
         return None
 
     @staticmethod
-    def _format_gib(num_bytes):
-        return f"{num_bytes / (1024 ** 3):.2f} GiB"
-
-    @staticmethod
     def _format_uptime(seconds):
         total = int(seconds)
         days, rem = divmod(total, 86400)
@@ -173,7 +169,6 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
 
         # cpu_percent는 interval을 주면 그 시간만큼 블로킹되므로 짧게만 사용
         cpu_usage = psutil.cpu_percent(interval=0.3)
-        cpu_count = psutil.cpu_count(logical=True) or os.cpu_count() or 1
         mem = psutil.virtual_memory()
 
         try:
@@ -187,7 +182,7 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
             {
                 "icon": "fa-solid fa-microchip",
                 "label": "CPU usage",
-                "value_text": f"{cpu_usage:.2f}% of {cpu_count} CPUs",
+                "value_text": f"{cpu_usage:.2f}%",
                 "percent": cpu_usage,
                 "status": self._status_level(cpu_usage, cfg["cpu"]),
             },
@@ -209,7 +204,7 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
         items.append({
             "icon": "fa-solid fa-memory",
             "label": "RAM usage",
-            "value_text": f"{mem.percent:.2f}% ({self._format_gib(mem.used)} of {self._format_gib(mem.total)})",
+            "value_text": f"{mem.percent:.2f}%",
             "percent": mem.percent,
             "status": self._status_level(mem.percent, cfg["mem"]),
             "group_start": True,
@@ -218,10 +213,7 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
         items.append({
             "icon": "fa-solid fa-hard-drive",
             "label": f"{cfg['disk_path']} HD space",
-            "value_text": (
-                f"{disk_usage:.2f}% ({self._format_gib(disk.used)} of {self._format_gib(disk.total)})"
-                if disk is not None else "확인 불가"
-            ),
+            "value_text": f"{disk_usage:.2f}%" if disk is not None else "확인 불가",
             "percent": disk_usage,
             "status": self._status_level(disk_usage, cfg["disk"]),
         })
@@ -243,7 +235,7 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
                     items.append({
                         "icon": "fa-solid fa-database",
                         "label": "Swap usage",
-                        "value_text": f"{swap.percent:.2f}% ({self._format_gib(swap.used)} of {self._format_gib(swap.total)})",
+                        "value_text": f"{swap.percent:.2f}%",
                         "percent": swap.percent,
                     })
             except Exception:
