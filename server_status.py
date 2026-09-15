@@ -60,7 +60,7 @@ from plugins.metadata.base import BaseMetadataProvider
 class ServerStatusMetadataProvider(BaseMetadataProvider):
     # id는 반드시 이 플러그인 폴더명("server_status")과 일치해야 합니다.
     id = "server_status"
-    name = "서버 상태 모니터"
+    name = "유메미루"
     is_searchable = False
 
     config_schema = [
