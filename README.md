@@ -61,12 +61,22 @@ BookOasis 홈 대시보드에 **CPU / 메모리 / 디스크 사용률**을 아�
 (`overflow-wrap: anywhere`)을 추가해 폭이 좁아지면 라벨 아래 줄로
 자연스럽게 넘어가도록 했습니다.
 
-**v4.2 (현재) — 부가 상세 정보 제거, 퍼센트만 표시**
+**v4.2 — 부가 상세 정보 제거, 퍼센트만 표시**
 CPU/RAM/Disk/Swap의 `value_text`에서 `"of 4 CPUs"`, `"(13.35 GiB of
 31.09 GiB)"` 같은 부가 정보를 빼고 퍼센트 값만 남겼습니다. 진행률
 바가 이미 시각적으로 비율을 보여주므로 부가 텍스트가 줄바꿈을
 유발하며 UI를 어수선하게 만들었기 때문입니다. Uptime/Load average/
 Network처럼 퍼센트가 없는 항목은 원래 형식 그대로 유지됩니다.
+
+**v4.3 (현재) — 카드 배경 + 라운드 처리로 시인성 개선**
+코어 기본 위젯("현재 읽는 중" 등)처럼 배경색과 둥근 모서리를 넣어
+배경과 구분되도록 했습니다.
+- `.ss-widget` 전체를 카드 형태로: `var(--app-bg-card)` 배경,
+  `border-radius: 14px`, 옅은 테두리
+- 각 행(`.ss-row`)에도 `var(--app-bg-main)` 배경과
+  `border-radius: 10px`을 줘서 항목별로도 시각적으로 구분되게 함
+- 진행률 바 트랙 배경을 살짝 더 진하게(`var(--app-border)`)해서 새
+  카드 배경 위에서도 잘 보이도록 대비를 높임
 
 `small` 모드는 CPU/RAM/Disk 3개 행(모두 바 포함)만, `general` 모드는
 여기에 Load average(유닉스 계열만)/Uptime/Swap/Network까지 추가로

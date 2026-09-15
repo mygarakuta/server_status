@@ -17,20 +17,26 @@
 .ss-widget {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: 2px 0;
+    gap: 12px;
     width: 100%;
     max-width: 100%;
     overflow: hidden;
     font-family: inherit;
+    background: var(--app-bg-card, #ffffff);
+    border: 1px solid var(--app-border-light, #e5e7eb);
+    border-radius: 14px;
+    padding: 14px 16px;
 }
 
 .ss-row {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
     min-width: 0;   /* flex 자식이 내용 길이만큼 폭을 밀어내지 않도록 */
     max-width: 100%;
+    background: var(--app-bg-main, #f8fafc);
+    border-radius: 10px;
+    padding: 10px 12px;
 }
 
 /* 같은 그룹(예: CPU+Load Average, RAM+Disk) 사이보다
@@ -84,7 +90,7 @@
     width: 100%;
     max-width: 100%;
     border-radius: 999px;
-    background: var(--app-border-light, #e2e8f0);
+    background: var(--app-border, #cbd5e1);
     overflow: hidden;
 }
 
