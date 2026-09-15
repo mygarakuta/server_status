@@ -1,11 +1,27 @@
 /* server_status 홈 위젯 전용 스타일
    Shadow DOM 안에서만 적용되므로 앱 전역 CSS와 충돌하지 않는다. */
 
+:host {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;   /* 위젯 카드 밖으로 가로/세로 스크롤바가 생기지 않도록 */
+    box-sizing: border-box;
+}
+
+.ss-widget,
+.ss-widget * {
+    box-sizing: border-box;
+}
+
 .ss-widget {
     display: flex;
     flex-direction: column;
     gap: 14px;
     padding: 2px 0;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
     font-family: inherit;
 }
 
@@ -13,6 +29,8 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+    min-width: 0;   /* flex 자식이 내용 길이만큼 폭을 밀어내지 않도록 */
+    max-width: 100%;
 }
 
 /* 같은 그룹(예: CPU+Load Average, RAM+Disk) 사이보다
@@ -23,9 +41,11 @@
 
 .ss-row-top {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
-    gap: 10px;
+    flex-wrap: wrap;   /* 라벨+값이 폭을 넘으면 옆이 아니라 다음 줄로 */
+    gap: 4px 10px;
+    min-width: 0;
 }
 
 .ss-row-label {
@@ -36,6 +56,8 @@
     font-weight: 500;
     color: var(--app-text-primary, #1e293b);
     white-space: nowrap;
+    flex: 0 1 auto;
+    min-width: 0;
 }
 
 .ss-row-icon {
@@ -48,12 +70,19 @@
 .ss-row-value {
     font-size: 0.95rem;
     color: var(--app-text-primary, #1e293b);
-    white-space: nowrap;
     text-align: right;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;   /* 넘치면 줄바꿈 (가로 스크롤 방지) */
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .ss-bar-track {
     height: 6px;
+    width: 100%;
+    max-width: 100%;
     border-radius: 999px;
     background: var(--app-border-light, #e2e8f0);
     overflow: hidden;
@@ -61,6 +90,7 @@
 
 .ss-bar-fill {
     height: 100%;
+    max-width: 100%;
     border-radius: 999px;
     background: var(--app-accent, #93c5fd);
     transition: width 0.4s ease;

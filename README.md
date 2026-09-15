@@ -54,6 +54,13 @@ BookOasis 홈 대시보드에 **CPU / 메모리 / 디스크 사용률**을 아�
 - `status`: `"danger"`(빨강) / `"warn"`(주황) / 그 외(테마 강조색)
 - `group_start`: 다음 시각적 그룹의 시작임을 표시해 위쪽에 약간 더 여백을 둠
 
+**v4.1 — 가로/세로 스크롤바 제거**
+값 텍스트(`value_text`)가 위젯 폭보다 길어질 때 옆으로 삐져나가 카드
+안에 스크롤바가 생기던 문제를 고쳤습니다. `dashboard.css`에
+`:host { overflow: hidden }`, `flex-wrap: wrap`, 값 텍스트 자동 줄바꿈
+(`overflow-wrap: anywhere`)을 추가해 폭이 좁아지면 라벨 아래 줄로
+자연스럽게 넘어가도록 했습니다.
+
 `small` 모드는 CPU/RAM/Disk 3개 행(모두 바 포함)만, `general` 모드는
 여기에 Load average(유닉스 계열만)/Uptime/Swap/Network까지 추가로
 보여줍니다.
