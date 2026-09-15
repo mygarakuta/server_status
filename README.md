@@ -1,82 +1,67 @@
 # 서버 상태 모니터 (server_status)
 
-BookOasis 홈 대시보드에 **CPU / 메모리 / 디스크 사용률**을 보여주는
-홈화면 전용(`home_widget`) 플러그인입니다. 설정에서 표시 방식을
-`small`(통합) / `general`(개별) 중 고를 수 있습니다.
+BookOasis 홈 대시보드에 **CPU / 메모리 / 디스크 사용률**을 아이콘 +
+라벨 + 값 + 진행률 바 형태로 보여주는 홈화면 전용(`home_widget`)
+플러그인입니다.
 
-## ⚠️ 버전 변경 이력 (겪었던 로딩/검증 실패와 최종 해결)
+## ⚠️ 버전 변경 이력
 
 **v1.x — 설정 화면 자체가 사라지는 문제**
-`home_widget`을 `@property`로 구현했더니, 코어가 클래스 레벨에서
-`home_widget`을 dict로 기대하고 접근하다가 property 객체를 만나 예외
-발생 → 플러그인 전체 로딩 실패 → 설정 화면까지 통째로 사라졌습니다.
-**교훈**: `home_widget`/`category_tab`/`detail_view` 같은 매니페스트
-계약은 항상 **고정 dict**로 선언해야 합니다.
+`home_widget`을 `@property`로 구현했다가 클래스 레벨 접근 실패로 플러그인
+전체 로딩이 실패했습니다. → 매니페스트는 항상 고정 dict로 선언해야 합니다.
 
 **v2.0~2.2 — 설치 검증기가 필드/폴더 규칙으로 거부**
-"작은 화면/큰 화면"을 별도 id의 두 클래스(두 플러그인)로 분리했다가,
-- mixin 상속만으로는 `is_searchable`/`search`/`apply`가 클래스 자신의
-  `__dict__`에 없다고 판정되어 실패했고,
-- `config_schema = 외부상수` 참조 방식도 "리스트 리터럴이 아님"으로
-  판정되어 실패했으며,
-- 무엇보다 **"폴더당 플러그인 1개, 클래스 id는 폴더명과 정확히 일치해야
-  함"** 이라는 근본 규칙과 애초에 맞지 않아 설치가 거부되었습니다.
+"작은/큰 화면"을 별도 id의 두 클래스(두 플러그인)로 분리했다가, mixin
+상속·외부 상수 참조 방식 모두 검증기가 인식하지 못했고, 무엇보다
+**"폴더당 플러그인 1개, id는 폴더명과 일치"** 규칙과 맞지 않아 거부되었습니다.
 
-**v3.0 — 단일 플러그인 + 설정 기반 분기로 최종 해결**
-아래 원칙으로 되돌렸습니다.
-1. 플러그인은 폴더당 정확히 1개, 클래스 `id`는 폴더명(`server_status`)과
-   완전히 동일합니다.
-2. `is_searchable`, `config_schema`(리스트 리터럴), `search`, `apply`,
-   `update_manifest`, `home_widget`은 전부 이 하나의 클래스 본문에
-   직접 선언되어 있습니다(외부 참조·상속 없음).
-3. `home_widget`은 완전히 고정된 dict입니다(`size: 1`로 고정 — 그리드
-   칸 수 자체는 설정으로 바꾸지 않습니다).
-4. "표시 방식" 선택은 `config_schema`의 `WIDGET_SIZE` 설정값에 따라
-   **`get_dashboard_data()`가 반환하는 카드 구성**을 바꾸는 방식으로
-   구현했습니다. 이 메서드는 원래도 요청마다 호출되므로 여기서 설정을
-   읽어 분기하는 것은 안전한 표준 패턴입니다.
+**v3.x — 단일 플러그인 + 유니코드 게이지 바**
+`id = 폴더명("server_status")`인 단일 플러그인으로 되돌리고, `small`
+(통합 1줄)/`general`(개별 카드) 두 모드를 설정으로 고를 수 있게 했습니다.
+당시 가이드는 `home_widget`의 `item_type:"metric"` 카드가 순수 텍스트만
+지원해서, 진행률 바를 `▰▱` 유니코드 문자로 흉내 냈습니다.
 
-**v3.1 — 작은 화면에서 가동시간 제외**
-`small` 모드에서는 가동시간 카드를 빼고 CPU/메모리/디스크만 표시하도록
-조정했습니다.
+**v4.0 (현재) — `dashboard.html`/`dashboard.css`/`dashboard.js` 도입**
+플러그인 가이드가 업데이트되어 `home_widget`에 완전한 커스텀 CSS/이미지를
+쓸 수 있게 되었습니다(위젯별 **Shadow DOM 격리** 렌더링, 코어 1.1.1+).
+이제 진짜 CSS 프로그레스 바로 교체했습니다.
 
-**v3.2 (현재) — small/general 모드 정의 명확화**
-- `small`: CPU/메모리/디스크 현황을 **하나의 통합 카드(리스트 1개)**에
-  함께 표시합니다. 값 예시: `CPU 4% · MEM 34% · DISK 48%`
-- `general`: CPU/메모리/디스크는 물론, 가동시간/스왑 사용률/네트워크
-  누적 트래픽까지 **전부 개별 카드(리스트 각각)**로 표시합니다.
+- `dashboard.html`: 빈 컨테이너(`<div id="ss-widget">`)만 두고
+- `dashboard.js`: `get_dashboard_data()`가 반환한 아이템 배열을 받아
+  아이콘 + 라벨 + 값(우측 정렬) 한 줄과, 그 아래 진행률 바를 동적으로
+  그립니다.
+- `dashboard.css`: 앱 테마 CSS 변수(`--app-text-primary`, `--app-accent`
+  등)를 사용해 테마 변경에도 자동으로 어울리도록 스타일링했습니다.
 
-**v3.3 (현재) — 유니코드 게이지 바 추가**
-사용자가 CPU/MEM/DISK 값 옆에 게이지(진행률) 바 형태를 요청했습니다.
-`home_widget`의 `item_type: "metric"` 카드는 라벨/값/설명 등 **순수
-텍스트만** 지원하고 커스텀 CSS 프로그레스 바를 그릴 자리가 없어서
-(그런 HTML 삽입은 `category_tab`/`detail_view`처럼 `index.html`을 직접
-서빙하는 계약에서만 가능), 완전히 동일한 둥근 색상 바는 만들 수
-없습니다. 대신 `▰`(채워짐)/`▱`(빈칸) 유니코드 문자를 percent 값에
-비례해 이어붙인 **텍스트 기반 간이 게이지 바**를 `value` 필드에
-포함시켜, 숫자 옆에 막대 형태가 보이도록 근사했습니다
-(`self._gauge(percent, width=10)`).
+`get_dashboard_data()`가 반환하는 아이템은 더 이상 core의 `metric`
+스키마(`metric`/`value`/`description`)를 따르지 않고, `dashboard.js`가
+직접 해석하는 자유 형식입니다:
 
-**v3.4 (현재) — 부제/카드 라벨/설명 텍스트 제거**
-사용자가 스크린샷에서 불필요하다고 표시한 3가지를 제거했습니다.
-- `home_widget.subtitle`을 빈 문자열로 변경 (부제 텍스트 미표시)
-- `small` 모드 카드의 `metric`(라벨 "자원 사용률")과 `description`
-  (하단 상세 텍스트)을 모두 빈 문자열로 변경 → 게이지 바가 붙은
-  `value` 3줄만 표시됩니다.
+```json
+{
+  "icon": "fa-solid fa-microchip",
+  "label": "CPU usage",
+  "value_text": "16.16% of 4 CPUs",
+  "percent": 16.16,
+  "status": null
+}
+```
 
-**참고**: 위젯 상단의 "제공: 서버 상태 모니터" 표시는 가이드의
-`home_widget` 필드(title/subtitle/icon/order/limit/sessions/layout/
-size) 어디에도 없는 항목입니다. 코어가 플러그인의 `name` 클래스 속성을
-이용해 자동으로 붙이는 어트리뷰션(출처 표시)으로 보이며, 문서화된
-계약 안에는 이를 끄는 옵션이 없어 **플러그인 코드로는 완전히 제거할
-수 없습니다**. `name`을 더 짧은 문자열로 바꾸면 표시되는 글자 수는
-줄일 수 있습니다.
+- `icon`: Font Awesome 클래스 문자열
+- `label` / `value_text`: 좌우로 배치되는 텍스트
+- `percent`: 있으면 그 값만큼 채워진 진행률 바를 그리고, 없으면(`null`)
+  바 없이 텍스트 줄만 표시 (예: Load average, Uptime, Network)
+- `status`: `"danger"`(빨강) / `"warn"`(주황) / 그 외(테마 강조색)
+- `group_start`: 다음 시각적 그룹의 시작임을 표시해 위쪽에 약간 더 여백을 둠
+
+`small` 모드는 CPU/RAM/Disk 3개 행(모두 바 포함)만, `general` 모드는
+여기에 Load average(유닉스 계열만)/Uptime/Swap/Network까지 추가로
+보여줍니다.
 
 ## 설치
 
 1. 이 폴더(`server_status`)를 통째로 BookOasis의 `plugins/metadata/`
-   아래에 복사합니다. **폴더명은 반드시 `server_status`여야 합니다**
-   (클래스 `id`와 정확히 일치해야 검증을 통과합니다).
+   아래에 복사합니다. **폴더명은 반드시 `server_status`여야 합니다.**
    ```
    plugins/metadata/
      server_status/
@@ -85,52 +70,48 @@ size) 어디에도 없는 항목입니다. 코어가 플러그인의 `name` 클�
        VERSION
        requirements.txt
        README.md
+       dashboard.html
+       dashboard.css
+       dashboard.js
    ```
-2. 서버를 재시작합니다. (`requirements.txt`의 `psutil`이 플러그인 전용
-   `libs/`에 자동 격리 설치됩니다.)
+2. 서버를 재시작합니다. (`dashboard.html`/`css`/`js` 지원은 코어
+   1.1.1+ 필요 — 이보다 낮은 버전에서는 이 파일들이 조용히 무시되고,
+   `get_dashboard_data()`가 반환한 값이 대신 기존 화이트리스트
+   텍스트 렌더러로 표시되어 값이 다소 어색하게 나올 수 있습니다.
+   이 경우 코어를 업그레이드하거나, 이전 버전(v3.x)을 사용하십시오.)
 3. [환경설정 ⚙️ > 플러그인 설정]에서 "서버 상태 모니터"를 **활성화**합니다.
 4. 필요하면 아래 설정값을 조정 후 저장합니다.
-   - `CPU_WARN` / `MEM_WARN` / `DISK_WARN`: 각 자원의 경고 임계치(%)
-     — 초과 시 카드 설명에 🔴, 85% 이상 근접 시 🟡, 그 외 🟢로 표시됩니다.
+   - `CPU_WARN` / `MEM_WARN` / `DISK_WARN`: 경고 임계치(%) — 초과 시
+     바 색상이 빨강(`danger`), 85% 이상 근접 시 주황(`warn`)으로 표시됩니다.
    - `DISK_PATH`: 사용률을 확인할 디스크 경로 (기본값 `/`)
-   - `CACHE_TTL_SEC`: 홈 화면을 자주 열 때 psutil 재측정을 줄이기 위한
-     캐시 유지 시간(초, 기본 5초)
-   - **`WIDGET_SIZE`(표시 방식)**:
-     - `small` (기본값): CPU/메모리/디스크를 **한 카드에 통합**해서 표시
-     - `general`: CPU/메모리/디스크 + 가동시간/스왑/네트워크를
-       **각각 개별 카드**로 표시 (최대 6개)
+   - `CACHE_TTL_SEC`: 캐시 유지 시간(초, 기본 5초)
+   - `WIDGET_SIZE` (표시 방식): `small` / `general`
 5. [내 설정 > 홈 화면 플러그인 배치 모드]를 켭니다.
 6. 홈 화면 하단의 "+ 위젯 추가" 목록에서 "홈 서버 자원 상태" 위젯을
    추가합니다.
 
-## 참고: 그리드 칸 수(size)는 바뀌지 않습니다
-
-`home_widget.size`는 위젯 등록 시점에 고정되어야 안전한 값이라 `1`로
-고정해 두었습니다. `WIDGET_SIZE=general`을 선택해도 위젯이 차지하는
-grid 칸 수 자체는 늘어나지 않고, **카드 개수(표시되는 정보량)만**
-1개 → 최대 6개로 늘어납니다. 카드가 늘어난 만큼 위젯 카드 세로 길이가
-조금 더 길어지는 정도로 이해하시면 됩니다.
-
 ## 동작 방식
 
-- 별도의 `index.html`/`style.css`/`script.js` 없이, 코어가 기본 제공하는
-  `item_type: "metric"` 카드 렌더러를 그대로 사용합니다.
 - 매 홈 화면 로드마다 `psutil`을 재호출하는 대신, 플러그인 전용 Redis
   캐시(`self.cache_get`/`self.cache_set`)로 짧게(기본 5초) 결과를
-  재사용해 서버 부담을 줄입니다. 캐시 키에 `small`/`general` 구분을
-  넣어, 설정을 바꿔도 이전 모드의 캐시가 섞이지 않게 했습니다.
-- CPU 사용률은 `psutil.cpu_percent(interval=0.3)`로 측정하며, 이 0.3초는
-  요청 처리 스레드 안에서만 짧게 블로킹됩니다(캐시로 인해 실제 호출
-  빈도는 `CACHE_TTL_SEC`당 최대 1회).
+  재사용합니다. 캐시 키에 `small`/`general` 구분을 넣어 모드를 바꿔도
+  섞이지 않게 했습니다.
+- CPU 사용률은 `psutil.cpu_percent(interval=0.3)`로 측정하며, 캐시
+  덕분에 실제 호출 빈도는 `CACHE_TTL_SEC`당 최대 1회입니다.
+- `dashboard.js`는 `textContent`만 사용해 라벨/값 텍스트를 그리므로
+  (`innerHTML` 미사용), 값에 이상한 문자가 섞여도 XSS로 이어지지
+  않습니다. `icon`은 플러그인 코드가 만든 고정 문자열만 `className`에
+  넣습니다.
 
 ## 배운 점 (플러그인 개발자를 위한 메모)
 
 1. `home_widget` 등 매니페스트 계약은 **항상 고정 dict**로 선언하고,
-   설정에 따라 달라져야 하는 부분은 **`get_dashboard_data()` 같은
-   메서드 내부**에서 처리하십시오.
-2. 필수 필드(`is_searchable`, `config_schema` 등)와 메서드(`search`,
-   `apply`)는 **mixin이나 외부 상수 참조 없이, 실제 플러그인 클래스
-   본문에 리터럴로 직접** 선언하십시오.
-3. **한 폴더 = 한 플러그인**이며, 클래스의 `id`는 **폴더명과 정확히
-   일치**해야 합니다. 여러 변형을 제공하고 싶다면 별도 플러그인(별도
-   폴더)으로 만들지 말고, 이 플러그인처럼 **설정 옵션으로 분기**하십시오.
+   설정에 따라 달라지는 부분은 `get_dashboard_data()` 내부에서 처리하십시오.
+2. 필수 필드/메서드(`is_searchable`, `config_schema`, `search`, `apply`)는
+   **실제 플러그인 클래스 본문에 리터럴로 직접** 선언하십시오.
+3. **한 폴더 = 한 플러그인**, 클래스 `id`는 **폴더명과 정확히 일치**해야
+   합니다.
+4. 완전한 CSS/레이아웃이 필요한 홈 위젯은 `dashboard.html`/`css`/`js`를
+   사용하십시오. 이 경우 `get_dashboard_data()`의 아이템 스키마는 코어의
+   `metric` 규격에 얽매이지 않고, `dashboard.js`가 이해하는 자유
+   형식으로 설계해도 됩니다 — 렌더링을 플러그인이 전부 책임지기 때문입니다.

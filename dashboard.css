@@ -1,0 +1,81 @@
+/* server_status 홈 위젯 전용 스타일
+   Shadow DOM 안에서만 적용되므로 앱 전역 CSS와 충돌하지 않는다. */
+
+.ss-widget {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 2px 0;
+    font-family: inherit;
+}
+
+.ss-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* 같은 그룹(예: CPU+Load Average, RAM+Disk) 사이보다
+   그룹과 그룹 사이를 조금 더 벌려서 시각적으로 묶어 보이게 한다 */
+.ss-row.ss-group-start {
+    margin-top: 6px;
+}
+
+.ss-row-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.ss-row-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--app-text-primary, #1e293b);
+    white-space: nowrap;
+}
+
+.ss-row-icon {
+    width: 18px;
+    text-align: center;
+    color: var(--app-text-muted, #64748b);
+    flex-shrink: 0;
+}
+
+.ss-row-value {
+    font-size: 0.95rem;
+    color: var(--app-text-primary, #1e293b);
+    white-space: nowrap;
+    text-align: right;
+}
+
+.ss-bar-track {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--app-border-light, #e2e8f0);
+    overflow: hidden;
+}
+
+.ss-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--app-accent, #93c5fd);
+    transition: width 0.4s ease;
+}
+
+.ss-bar-fill.ss-warn {
+    background: #f59e0b;
+}
+
+.ss-bar-fill.ss-danger {
+    background: #ef4444;
+}
+
+.ss-empty {
+    color: var(--app-text-muted, #64748b);
+    font-size: 0.9rem;
+    padding: 8px 0;
+}
