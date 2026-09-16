@@ -77,8 +77,8 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
             "type": "select",
             "default": "small",
             "options": [
-                {"value": "small", "label": "small (CPU/메모리/디스크 게이지만)"},
-                {"value": "general", "label": "general (위 게이지 + 스왑 게이지 + 로드애버리지/가동시간/네트워크)"},
+                {"value": "small", "label": "small (CPU/RAM/Disk/Swap 게이지만)"},
+                {"value": "general", "label": "general (위 게이지 4종 + 로드애버리지/가동시간/네트워크)"},
             ],
         },
     ]
@@ -225,23 +225,24 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
                 "svg": self._gauge_svg(disk_usage, cfg["disk"]) if disk is not None else None,
             },
         ]
+
+        # 스왑도 항상 게이지로 표시 (임계치는 별도 설정 없이 80% 고정 사용)
+        try:
+            swap = psutil.swap_memory()
+            if swap.total > 0:
+                gauges.append({
+                    "kind": "gauge",
+                    "label": "Swap usage",
+                    "svg": self._gauge_svg(swap.percent, 80.0),
+                })
+        except Exception:
+            pass
+
         gauges = [g for g in gauges if g.get("svg")]
 
         texts = []
 
         if mode == "general":
-            # 스왑도 게이지로 (임계치는 별도 설정 없이 80% 고정 사용)
-            try:
-                swap = psutil.swap_memory()
-                if swap.total > 0:
-                    gauges.append({
-                        "kind": "gauge",
-                        "label": "Swap usage",
-                        "svg": self._gauge_svg(swap.percent, 80.0),
-                    })
-            except Exception:
-                pass
-
             # 로드 애버리지는 유닉스 계열에서만 지원 (Windows에는 없음)
             if hasattr(os, "getloadavg"):
                 try:

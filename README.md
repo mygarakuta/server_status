@@ -62,9 +62,17 @@ Uptime / Network처럼 0~100% 스케일이 아닌 값은 텍스트 행으로 별
   1fr))`로 배치되어, 위젯 폭이 넓으면 여러 개가 한 줄에, 좁으면 자동
   으로 줄바꿈됩니다.
 
-`small` 모드는 CPU/RAM/Disk 게이지 3개만, `general` 모드는 여기에
-Swap 게이지 1개 + Load average(유닉스 계열만)/Uptime/Network 텍스트
-행까지 추가로 보여줍니다.
+`small` 모드는 CPU/RAM/Disk/Swap 게이지 4개(스왑이 있는 서버 기준),
+`general` 모드는 여기에 Load average(유닉스 계열만)/Uptime/Network
+텍스트 행까지 추가로 보여줍니다.
+
+**v5.1 (현재) — 기본(small) 모드에 Swap 게이지 포함**
+스크린샷 레퍼런스처럼 평상시(=`small` 모드)에도 CPU/RAM/Disk 3개가
+아니라 **CPU/RAM/Disk/Swap 4개 게이지**가 항상 보이도록 수정했습니다.
+`general` 모드와의 차이는 이제 게이지 개수가 아니라, 텍스트 행(Load
+average/Uptime/Network)의 유무뿐입니다. 스왑이 아예 없는 서버(예:
+스왑 미설정 컨테이너)에서는 이전처럼 스왑 게이지가 자동으로 생략됩니다
+(psutil이 보고하는 스왑 총량이 0이면 게이지를 만들지 않음).
 
 ### 아이템 스키마 (v5.0 기준)
 
@@ -113,7 +121,9 @@ Swap 게이지 1개 + Load average(유닉스 계열만)/Uptime/Network 텍스트
      초록/노랑/빨강 색상 존 경계로 그대로 사용됩니다.
    - `DISK_PATH`: 사용률을 확인할 디스크 경로 (기본값 `/`)
    - `CACHE_TTL_SEC`: 캐시 유지 시간(초, 기본 5초)
-   - `WIDGET_SIZE` (표시 방식): `small` / `general`
+   - `WIDGET_SIZE` (표시 방식):
+     - `small` (기본값): CPU/RAM/Disk/Swap 게이지 4개만
+     - `general`: 위 게이지 4개 + Load average/Uptime/Network 텍스트 행
 5. [내 설정 > 홈 화면 플러그인 배치 모드]를 켭니다.
 6. 홈 화면 하단의 "+ 위젯 추가" 목록에서 "홈 서버 자원 상태" 위젯을
    추가합니다.
