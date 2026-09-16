@@ -28,37 +28,92 @@
     padding: 14px 16px;
 }
 
-.ss-row {
+/* ── 게이지 그리드 (CPU/RAM/Disk/Swap) ── */
+
+.ss-gauge-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 10px;
+    width: 100%;
+}
+
+.ss-gauge-card {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    min-width: 0;   /* flex 자식이 내용 길이만큼 폭을 밀어내지 않도록 */
-    max-width: 100%;
+    align-items: center;
     background: var(--app-bg-main, #f8fafc);
     border-radius: 10px;
-    padding: 10px 12px;
-}
-
-/* 같은 그룹(예: CPU+Load Average, RAM+Disk) 사이보다
-   그룹과 그룹 사이를 조금 더 벌려서 시각적으로 묶어 보이게 한다 */
-.ss-row.ss-group-start {
-    margin-top: 6px;
-}
-
-.ss-row-top {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    flex-wrap: wrap;   /* 라벨+값이 폭을 넘으면 옆이 아니라 다음 줄로 */
-    gap: 4px 10px;
+    padding: 8px 6px 10px;
     min-width: 0;
 }
 
-.ss-row-label {
+.ss-gauge-svg-wrap {
+    width: 100%;
+}
+
+.ss-gauge-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.ss-gauge-needle {
+    stroke: var(--app-text-primary, #1e293b);
+    stroke-width: 4;
+    stroke-linecap: round;
+}
+
+.ss-gauge-hub {
+    fill: var(--app-text-primary, #1e293b);
+}
+
+.ss-gauge-value {
+    font-size: 15px;
+    font-weight: 700;
+    fill: var(--app-text-primary, #1e293b);
+}
+
+.ss-gauge-minmax {
+    font-size: 8px;
+    fill: var(--app-text-muted, #64748b);
+}
+
+.ss-gauge-label {
+    margin-top: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--app-text-primary, #1e293b);
+    text-align: center;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+/* ── 텍스트 행 (Load average / Uptime / Network) ── */
+
+.ss-text-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.ss-text-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    background: var(--app-bg-main, #f8fafc);
+    border-radius: 10px;
+    padding: 10px 12px;
+    min-width: 0;
+}
+
+.ss-text-label {
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     font-weight: 500;
     color: var(--app-text-primary, #1e293b);
     white-space: nowrap;
@@ -66,48 +121,23 @@
     min-width: 0;
 }
 
-.ss-row-icon {
+.ss-text-icon {
     width: 18px;
     text-align: center;
     color: var(--app-text-muted, #64748b);
     flex-shrink: 0;
 }
 
-.ss-row-value {
-    font-size: 0.95rem;
+.ss-text-value {
+    font-size: 0.9rem;
     color: var(--app-text-primary, #1e293b);
     text-align: right;
     flex: 1 1 auto;
     min-width: 0;
     max-width: 100%;
-    white-space: normal;   /* 넘치면 줄바꿈 (가로 스크롤 방지) */
+    white-space: normal;
     overflow-wrap: anywhere;
     word-break: break-word;
-}
-
-.ss-bar-track {
-    height: 6px;
-    width: 100%;
-    max-width: 100%;
-    border-radius: 999px;
-    background: var(--app-border, #cbd5e1);
-    overflow: hidden;
-}
-
-.ss-bar-fill {
-    height: 100%;
-    max-width: 100%;
-    border-radius: 999px;
-    background: var(--app-accent, #93c5fd);
-    transition: width 0.4s ease;
-}
-
-.ss-bar-fill.ss-warn {
-    background: #f59e0b;
-}
-
-.ss-bar-fill.ss-danger {
-    background: #ef4444;
 }
 
 .ss-empty {

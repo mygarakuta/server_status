@@ -2,8 +2,10 @@
 """
 서버 상태 모니터 플러그인 (Server Status Home Widget)
 -----------------------------------------------------
-BookOasis 홈 대시보드에 CPU / 메모리 / 디스크 사용률을 아이콘 + 라벨 +
-값 + 진행률 바 형태로 보여주는 "홈화면 전용" 위젯 플러그인입니다.
+BookOasis 홈 대시보드에 CPU / 메모리 / 디스크(/ 스왑) 사용률을
+Zabbix 스타일 반원형 게이지(색상 존 + 바늘 + 중앙 값)로 보여주는
+"홈화면 전용" 위젯 플러그인입니다. Load average / Uptime / Network처럼
+0~100% 스케일이 아닌 값은 게이지 대신 텍스트 행으로 표시합니다.
 
 ── 버전 이력 ──────────────────────────────────────────────
 v1.x  : home_widget을 @property로 구현 → 클래스 레벨 접근 실패로 전체
@@ -11,15 +13,16 @@ v1.x  : home_widget을 @property로 구현 → 클래스 레벨 접근 실패로
 v2.x  : "작은/큰 화면"을 별도 id의 두 클래스로 분리 → "폴더당 플러그인
         1개, id=폴더명" 규칙 위반으로 설치 거부.
 v3.x  : 단일 플러그인(id=폴더명)으로 복귀, WIDGET_SIZE 설정으로 small/
-        general 두 모드를 get_dashboard_data() 내부에서 분기. 진행률
-        바는 item_type:"metric" 카드가 텍스트만 지원해 유니코드 막대
-        문자(▰▱)로 근사.
-v4.0 (현재) : 플러그인 가이드가 `dashboard.html`/`dashboard.css`/
-        `dashboard.js`(Shadow DOM 격리 렌더링, 완전한 CSS 허용)를
-        지원하게 되어, 진짜 CSS 프로그레스 바로 교체했다. 이제
-        get_dashboard_data()는 core의 "metric" 스키마가 아니라
-        dashboard.js가 이해하는 자유 형식 아이템
-        (icon/label/value_text/percent/status)을 반환한다.
+        general 두 모드를 get_dashboard_data() 내부에서 분기. 진행률은
+        유니코드 막대 문자(▰▱)로 근사.
+v4.0~4.3 : dashboard.html/css/js(Shadow DOM 격리, 완전한 CSS 허용)로
+        진짜 CSS 프로그레스 바 + 카드 배경/라운드 적용.
+v5.0 (현재) : 프로그레스 바를 Zabbix 스타일 SVG 반원형 게이지(초록/
+        노랑/빨강 색상 존 + 바늘 + 중앙 퍼센트 텍스트)로 교체했다.
+        SVG 좌표 계산은 Python(math.cos/sin)에서 미리 완성해 문자열로
+        반환하고, dashboard.js는 그 결과를 그대로 삽입만 한다 — 값은
+        전부 숫자 연산 결과라 사용자 입력이 섞이지 않으므로 innerHTML
+        삽입이 안전하다(라벨 등 텍스트는 여전히 textContent만 사용).
 
 설치 방법:
 1. 이 폴더(server_status) 전체를 BookOasis의 `plugins/metadata/` 아래로
@@ -36,15 +39,14 @@ v4.0 (현재) : 플러그인 가이드가 `dashboard.html`/`dashboard.css`/
        dashboard.css
        dashboard.js
    ```
-2. 서버를 재시작합니다. (dashboard.html/css/js를 지원하는 코어 1.1.1+
-   필요 — 그보다 낮은 버전에서는 이 파일들이 무시되고 기존 텍스트
-   카드로 자동 폴백됩니다.)
-3. [환경설정 > 플러그인 설정]에서 "서버 상태 모니터"를 활성화하고,
-   경고 임계치와 표시 방식(small/general)을 조정 후 저장합니다.
+2. 서버를 재시작합니다. (dashboard.html/css/js 지원은 코어 1.1.1+ 필요)
+3. [환경설정 > 플러그인 설정]에서 "유메미루"를 활성화하고, 경고 임계치와
+   표시 방식(small/general)을 조정 후 저장합니다.
 4. [내 설정 > 홈 화면 플러그인 배치 모드]를 켠 뒤, 홈 화면의
    "+ 위젯 추가" 목록에서 "홈 서버 자원 상태" 위젯을 추가합니다.
 """
 import os
+import math
 import time
 import json
 from datetime import datetime
@@ -75,8 +77,8 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
             "type": "select",
             "default": "small",
             "options": [
-                {"value": "small", "label": "small (CPU/메모리/디스크만)"},
-                {"value": "general", "label": "general (CPU/로드애버리지/메모리/디스크/가동시간/스왑/네트워크)"},
+                {"value": "small", "label": "small (CPU/메모리/디스크 게이지만)"},
+                {"value": "general", "label": "general (위 게이지 + 스왑 게이지 + 로드애버리지/가동시간/네트워크)"},
             ],
         },
     ]
@@ -107,7 +109,7 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
     def _get_widget_size(self, db_type):
         cfg = self.get_plugin_config(db_type, default={})
         value = str(cfg.get("WIDGET_SIZE", "small")).strip().lower()
-        # "small"이 아니면 전부 "general"(개별/상세) 모드로 취급한다.
+        # "small"이 아니면 전부 "general"(상세) 모드로 취급한다.
         return "small" if value == "small" else "general"
 
     def _get_config(self, db_type):
@@ -126,17 +128,6 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
             "disk_path": cfg.get("DISK_PATH") or "/",
             "cache_ttl": int(_num("CACHE_TTL_SEC", 5)),
         }
-
-    @staticmethod
-    def _status_level(value, warn):
-        """진행률 바 색상을 위한 상태 문자열 (dashboard.js가 해석)."""
-        if value is None:
-            return None
-        if value >= warn:
-            return "danger"
-        if value >= warn * 0.85:
-            return "warn"
-        return None
 
     @staticmethod
     def _format_uptime(seconds):
@@ -161,6 +152,53 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
             value /= 1024.0
         return f"{value:.1f}PB"
 
+    @staticmethod
+    def _gauge_point(percent, radius, cx=100, cy=100):
+        """반원(왼쪽=0%, 위쪽=50%, 오른쪽=100%) 위의 좌표를 계산한다."""
+        angle_deg = 180.0 - (percent / 100.0) * 180.0
+        theta = math.radians(angle_deg)
+        return cx + radius * math.cos(theta), cy - radius * math.sin(theta)
+
+    @classmethod
+    def _gauge_arc_path(cls, p_start, p_end, radius, cx=100, cy=100):
+        x1, y1 = cls._gauge_point(p_start, radius, cx, cy)
+        x2, y2 = cls._gauge_point(p_end, radius, cx, cy)
+        return f"M {x1:.2f} {y1:.2f} A {radius} {radius} 0 0 1 {x2:.2f} {y2:.2f}"
+
+    @classmethod
+    def _gauge_svg(cls, value, warn):
+        """Zabbix 스타일 반원형 게이지 SVG 마크업을 생성한다.
+        value/warn은 전부 숫자 연산 결과이므로(사용자 입력 없음),
+        결과 문자열을 dashboard.js에서 innerHTML로 그대로 삽입해도 안전하다."""
+        value = 0.0 if value is None else max(0.0, min(100.0, float(value)))
+        warn = max(1.0, min(99.0, float(warn) if warn else 80.0))
+
+        zones = [
+            (0.0, warn * 0.85, "#22c55e"),   # 초록
+            (warn * 0.85, warn, "#eab308"),  # 노랑
+            (warn, 100.0, "#ef4444"),        # 빨강
+        ]
+        radius = 78
+        stroke_w = 14
+        zone_svg = "".join(
+            f'<path d="{cls._gauge_arc_path(a, b, radius)}" stroke="{color}" '
+            f'stroke-width="{stroke_w}" fill="none"/>'
+            for a, b, color in zones if b > a
+        )
+
+        needle_x, needle_y = cls._gauge_point(value, radius - 12)
+
+        return (
+            '<svg viewBox="0 0 200 118" class="ss-gauge-svg" xmlns="http://www.w3.org/2000/svg">'
+            f'{zone_svg}'
+            f'<line x1="100" y1="100" x2="{needle_x:.2f}" y2="{needle_y:.2f}" class="ss-gauge-needle"/>'
+            '<circle cx="100" cy="100" r="6" class="ss-gauge-hub"/>'
+            f'<text x="100" y="80" text-anchor="middle" class="ss-gauge-value">{value:.2f}%</text>'
+            '<text x="16" y="112" text-anchor="start" class="ss-gauge-minmax">0%</text>'
+            '<text x="184" y="112" text-anchor="end" class="ss-gauge-minmax">100%</text>'
+            '</svg>'
+        )
+
     def _collect_metrics(self, db_type, mode):
         if psutil is None:
             return {"success": False, "error": "psutil 모듈이 설치되어 있지 않습니다."}
@@ -178,86 +216,77 @@ class ServerStatusMetadataProvider(BaseMetadataProvider):
             disk = None
             disk_usage = None
 
-        items = [
+        gauges = [
+            {"kind": "gauge", "label": "CPU usage", "svg": self._gauge_svg(cpu_usage, cfg["cpu"])},
+            {"kind": "gauge", "label": "RAM usage", "svg": self._gauge_svg(mem.percent, cfg["mem"])},
             {
-                "icon": "fa-solid fa-microchip",
-                "label": "CPU usage",
-                "value_text": f"{cpu_usage:.2f}%",
-                "percent": cpu_usage,
-                "status": self._status_level(cpu_usage, cfg["cpu"]),
+                "kind": "gauge",
+                "label": f"{cfg['disk_path']} disk",
+                "svg": self._gauge_svg(disk_usage, cfg["disk"]) if disk is not None else None,
             },
         ]
+        gauges = [g for g in gauges if g.get("svg")]
 
-        # 로드 애버리지는 유닉스 계열에서만 지원 (Windows에는 없음)
-        if mode == "general" and hasattr(os, "getloadavg"):
-            try:
-                load1, load5, load15 = os.getloadavg()
-                items.append({
-                    "icon": "fa-solid fa-gauge-high",
-                    "label": "Load average",
-                    "value_text": f"{load1:.2f}, {load5:.2f}, {load15:.2f}",
-                    "percent": None,
-                })
-            except Exception:
-                pass
-
-        items.append({
-            "icon": "fa-solid fa-memory",
-            "label": "RAM usage",
-            "value_text": f"{mem.percent:.2f}%",
-            "percent": mem.percent,
-            "status": self._status_level(mem.percent, cfg["mem"]),
-            "group_start": True,
-        })
-
-        items.append({
-            "icon": "fa-solid fa-hard-drive",
-            "label": f"{cfg['disk_path']} HD space",
-            "value_text": f"{disk_usage:.2f}%" if disk is not None else "확인 불가",
-            "percent": disk_usage,
-            "status": self._status_level(disk_usage, cfg["disk"]),
-        })
+        texts = []
 
         if mode == "general":
-            boot_ts = psutil.boot_time()
-            uptime_seconds = time.time() - boot_ts
-            items.append({
-                "icon": "fa-solid fa-clock",
-                "label": "Uptime",
-                "value_text": f"{self._format_uptime(uptime_seconds)} (부팅: {datetime.fromtimestamp(boot_ts).strftime('%Y-%m-%d %H:%M')})",
-                "percent": None,
-                "group_start": True,
-            })
-
+            # 스왑도 게이지로 (임계치는 별도 설정 없이 80% 고정 사용)
             try:
                 swap = psutil.swap_memory()
                 if swap.total > 0:
-                    items.append({
-                        "icon": "fa-solid fa-database",
+                    gauges.append({
+                        "kind": "gauge",
                         "label": "Swap usage",
-                        "value_text": f"{swap.percent:.2f}%",
-                        "percent": swap.percent,
+                        "svg": self._gauge_svg(swap.percent, 80.0),
                     })
             except Exception:
                 pass
 
+            # 로드 애버리지는 유닉스 계열에서만 지원 (Windows에는 없음)
+            if hasattr(os, "getloadavg"):
+                try:
+                    load1, load5, load15 = os.getloadavg()
+                    texts.append({
+                        "kind": "text",
+                        "icon": "fa-solid fa-gauge-high",
+                        "label": "Load average",
+                        "value_text": f"{load1:.2f}, {load5:.2f}, {load15:.2f}",
+                    })
+                except Exception:
+                    pass
+
+            boot_ts = psutil.boot_time()
+            uptime_seconds = time.time() - boot_ts
+            texts.append({
+                "kind": "text",
+                "icon": "fa-solid fa-clock",
+                "label": "Uptime",
+                "value_text": (
+                    f"{self._format_uptime(uptime_seconds)} "
+                    f"(부팅: {datetime.fromtimestamp(boot_ts).strftime('%Y-%m-%d %H:%M')})"
+                ),
+            })
+
             try:
                 net = psutil.net_io_counters()
-                items.append({
+                texts.append({
+                    "kind": "text",
                     "icon": "fa-solid fa-network-wired",
                     "label": "Network (누적)",
                     "value_text": f"↑{self._format_bytes(net.bytes_sent)} / ↓{self._format_bytes(net.bytes_recv)}",
-                    "percent": None,
                 })
             except Exception:
                 pass
 
-        return {"success": True, "items": items}
+        # 코어 계약({'success': True, 'items': [...]})을 지키기 위해 게이지와
+        # 텍스트 행을 하나의 items 리스트로 합친다. dashboard.js가 각
+        # 아이템의 'kind' 값으로 게이지 그리드 / 텍스트 목록에 나눠 배치한다.
+        return {"success": True, "items": gauges + texts}
 
     # ── 공통 계약: home_widget이 재사용하는 표준 메서드 ──
     def get_dashboard_data(self, db_type, limit=10):
         mode = self._get_widget_size(db_type)  # "small" 또는 "general"
-        cache_key = f"metrics:{db_type}:{mode}:v4"
+        cache_key = f"metrics:{db_type}:{mode}:v5"
 
         cached = self.cache_get(cache_key)
         if cached:
